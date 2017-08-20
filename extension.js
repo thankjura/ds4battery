@@ -1,13 +1,10 @@
 const St = imports.gi.St;
 const Lang = imports.lang;
 const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
 const Main = imports.ui.main;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
-const Util = imports.misc.util;
 const Mainloop = imports.mainloop;
-const Extension = imports.misc.extensionUtils.getCurrentExtension();
 const Clutter = imports.gi.Clutter;
 
 const DEFAULT_ICON = "ds4-symbolic";
