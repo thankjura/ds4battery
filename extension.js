@@ -81,7 +81,29 @@ const DS4Battery = new Lang.Class({
                     if (statusValue[1].toString().indexOf("Charging") > -1) {
                         this._icon.icon_name = CHARGING_ICON;
                     } else {
-                        this._icon.icon_name = DEFAULT_ICON;
+                        if (power < 10) {
+                            this._icon.icon_name = DEFAULT_ICON + "-00";
+                        } else if (power < 20) {
+                            this._icon.icon_name = DEFAULT_ICON + "-10";
+                        } else if (power < 30) {
+                            this._icon.icon_name = DEFAULT_ICON + "-20";
+                        } else if (power < 40) {
+                            this._icon.icon_name = DEFAULT_ICON + "-30";
+                        } else if (power < 50) {
+                            this._icon.icon_name = DEFAULT_ICON + "-40";
+                        } else if (power < 60) {
+                            this._icon.icon_name = DEFAULT_ICON + "-50";
+                        } else if (power < 70) {
+                            this._icon.icon_name = DEFAULT_ICON + "-60";
+                        } else if (power < 80) {
+                            this._icon.icon_name = DEFAULT_ICON + "-70";
+                        } else if (power < 90) {
+                            this._icon.icon_name = DEFAULT_ICON + "-80";
+                        } else if (power < 100) {
+                            this._icon.icon_name = DEFAULT_ICON + "-90";
+                        } else if (power > 90) {
+                            this._icon.icon_name = DEFAULT_ICON;
+                        }
                     }
                     
                     this.actor.show();
