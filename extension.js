@@ -7,8 +7,8 @@ const GLib = imports.gi.GLib;
 const Mainloop = imports.mainloop;
 const Clutter = imports.gi.Clutter;
 
-const DEFAULT_ICON = "ds4-symbolic";
-const CHARGING_ICON = "ds4-charging-symbolic";
+const ICON_PREFIX = "ds4-";
+const ICON_SYMBOLIC = "-symbolic";
 
 const DS4Battery = new Lang.Class({
     Name: "DualShock 4 Power",
@@ -18,7 +18,7 @@ const DS4Battery = new Lang.Class({
         PanelMenu.Button.prototype._init.call(this, 0, 'ds4battery');
 
         this._icon = new St.Icon({
-            icon_name: DEFAULT_ICON,
+            icon_name: ICON_PREFIX + "default" + ICON_SYMBOLIC,
             style_class: 'system-status-icon',
 
         });
@@ -79,30 +79,30 @@ const DS4Battery = new Lang.Class({
                     this.statusLabel.set_text(power + "%");
                     
                     if (statusValue[1].toString().indexOf("Charging") > -1) {
-                        this._icon.icon_name = CHARGING_ICON;
+                        this._icon.icon_name = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
                     } else {
                         if (power < 10) {
-                            this._icon.icon_name = DEFAULT_ICON + "-00";
+                            this._icon.icon_name = ICON_PREFIX + "00" + ICON_SYMBOLIC;
                         } else if (power < 20) {
-                            this._icon.icon_name = DEFAULT_ICON + "-10";
+                            this._icon.icon_name = ICON_PREFIX + "10" + ICON_SYMBOLIC;
                         } else if (power < 30) {
-                            this._icon.icon_name = DEFAULT_ICON + "-20";
+                            this._icon.icon_name = ICON_PREFIX + "20" + ICON_SYMBOLIC;
                         } else if (power < 40) {
-                            this._icon.icon_name = DEFAULT_ICON + "-30";
+                            this._icon.icon_name = ICON_PREFIX + "30" + ICON_SYMBOLIC;
                         } else if (power < 50) {
-                            this._icon.icon_name = DEFAULT_ICON + "-40";
+                            this._icon.icon_name = ICON_PREFIX + "40" + ICON_SYMBOLIC;
                         } else if (power < 60) {
-                            this._icon.icon_name = DEFAULT_ICON + "-50";
+                            this._icon.icon_name = ICON_PREFIX + "50" + ICON_SYMBOLIC;
                         } else if (power < 70) {
-                            this._icon.icon_name = DEFAULT_ICON + "-60";
+                            this._icon.icon_name = ICON_PREFIX + "60" + ICON_SYMBOLIC;
                         } else if (power < 80) {
-                            this._icon.icon_name = DEFAULT_ICON + "-70";
+                            this._icon.icon_name = ICON_PREFIX + "70" + ICON_SYMBOLIC;
                         } else if (power < 90) {
-                            this._icon.icon_name = DEFAULT_ICON + "-80";
+                            this._icon.icon_name = ICON_PREFIX + "80" + ICON_SYMBOLIC;
                         } else if (power < 100) {
-                            this._icon.icon_name = DEFAULT_ICON + "-90";
-                        } else if (power > 90) {
-                            this._icon.icon_name = DEFAULT_ICON;
+                            this._icon.icon_name = ICON_PREFIX + "90" + ICON_SYMBOLIC;
+                        } else {
+                            this._icon.icon_name = ICON_PREFIX + "default" + ICON_SYMBOLIC;
                         }
                     }
                     
