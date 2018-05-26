@@ -9,41 +9,111 @@ const Clutter = imports.gi.Clutter;
 
 const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
+const DEVICE_PREFIX = "sony_controller_battery_";
 
 const DS4Battery = new Lang.Class({
     Name: "DualShock 4 Power",
     Extends: PanelMenu.Button,
 
+    _devices: {},
+
+    _readFile: function(deviceId, fileName) {
+        let filePath = GLib.build_filenamev([this._powerDir.get_path(), DEVICE_PREFIX + deviceId, fileName]);
+        let file = Gio.File.new_for_path(filePath);
+        let out = file.load_contents(null);
+        let value = out[1];
+        if (value) {
+            return value.toString().replace("\n", "");
+        }
+
+        return "";
+    },
+
+    _getDeviceInfo: function(deviceId) {
+        let out = {};
+
+        let status = this._readFile(deviceId, "status");
+        let power = this._readFile(deviceId, "capacity");
+        out["power"] = power ? power + "%" : "--";
+        if (status !== "Discharging") {
+            out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
+        } else {
+            if (power < 10) {
+                out["icon"] = ICON_PREFIX + "00" + ICON_SYMBOLIC;
+            } else if (power < 20) {
+                out["icon"] = ICON_PREFIX + "10" + ICON_SYMBOLIC;
+            } else if (power < 30) {
+                out["icon"] = ICON_PREFIX + "20" + ICON_SYMBOLIC;
+            } else if (power < 40) {
+                out["icon"] = ICON_PREFIX + "30" + ICON_SYMBOLIC;
+            } else if (power < 50) {
+                out["icon"] = ICON_PREFIX + "40" + ICON_SYMBOLIC;
+            } else if (power < 60) {
+                out["icon"] = ICON_PREFIX + "50" + ICON_SYMBOLIC;
+            } else if (power < 70) {
+                out["icon"] = ICON_PREFIX + "60" + ICON_SYMBOLIC;
+            } else if (power < 80) {
+                out["icon"] = ICON_PREFIX + "70" + ICON_SYMBOLIC;
+            } else if (power < 90) {
+                out["icon"] = ICON_PREFIX + "80" + ICON_SYMBOLIC;
+            } else if (power < 100) {
+                out["icon"] = ICON_PREFIX + "90" + ICON_SYMBOLIC;
+            } else {
+                out["icon"] = ICON_PREFIX + "default" + ICON_SYMBOLIC;
+            }
+        }
+
+        return out;
+    },
+
+    _setBox: function(deviceId) {
+        var box = this._devices[deviceId];
+        let devInfo = this._getDeviceInfo(deviceId);
+
+        if (!box) {
+            let icon = new St.Icon({
+                icon_name: devInfo["icon"],
+                style_class: 'system-status-icon'
+            });
+
+            let label = new St.Label({
+                y_align: Clutter.ActorAlign.CENTER,
+                text: devInfo["power"],
+                style_class: "power-label"
+            });
+            box = {
+                icon: icon,
+                label: label
+            };
+            var layout = new St.BoxLayout({ name: 'ds4Box:' + deviceId , vertical: false });
+            layout.add_actor(box.icon);
+            layout.add_actor(box.label);
+            box["layout"] = layout;
+            this.actor.add_actor(layout);
+            this._devices[deviceId] = box;
+        } else {
+            box.icon.icon_name = devInfo["icon"];
+            box.label.text = devInfo["power"];
+        }
+        return box;
+    },
+
+    _delBox: function(deviceId) {
+        var box = this._devices[deviceId];
+        if (box) {
+            box["layout"].destroy();
+            delete this._devices[deviceId];
+        }
+    },
+
     _init: function() {
         PanelMenu.Button.prototype._init.call(this, 0, 'ds4battery');
 
-        this._icon = new St.Icon({
-            icon_name: ICON_PREFIX + "default" + ICON_SYMBOLIC,
-            style_class: 'system-status-icon',
+        this._powerDir = Gio.File.new_for_path("/sys/class/power_supply");
 
-        });
-
-        this.statusLabel = new St.Label({
-            y_align: Clutter.ActorAlign.CENTER,
-            text: "--",
-            style_class: "power-label"
-        });
-
-        this._destroy();
-
-        let box = new St.BoxLayout({ name: 'ds4Box' , vertical: false });
-        box.add_actor(this._icon);
-		box.add_actor(this.statusLabel);
-		this.actor.add_actor(box);
-
-        if(!this.sensorsPath) {
-            this.title='Warning';
-            this.content='Please install UPower';
-        } 
-
-        this._updateStatus();
-        event = GLib.timeout_add_seconds(0, 5, Lang.bind(this, function () {
-            this._updateStatus();
+        this._updateBoxes();
+        event = GLib.timeout_add_seconds(0, 5, Lang.bind(this, function() {
+            this._updateBoxes();
             return true;
         }));
     },
@@ -54,61 +124,34 @@ const DS4Battery = new Lang.Class({
         });
     },
 
-    _updateStatus: function() {        
-        let powerDir = Gio.File.new_for_path("/sys/class/power_supply");
-
+    _updateBoxes: function() {
         let fileEnum;
         try {
-            fileEnum = powerDir.enumerate_children('standard::name,standard::type', Gio.FileQueryInfoFlags.NONE, null);
+            fileEnum = this._powerDir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
         } catch (e) {
             fileEnum = null;
         }
-
+        let activeDevices = Object.keys(this._devices);
         if (fileEnum != null) {
             let info;
             while ((info = fileEnum.next_file(null))) {
-                if (info.get_name().startsWith("sony_controller_battery_")) {
-                    let powerPath = GLib.build_filenamev([powerDir.get_path(), info.get_name(), "capacity"]);
-                    let statusPath = GLib.build_filenamev([powerDir.get_path(), info.get_name(), "status"]);
-                    let powerFile = Gio.File.new_for_path(powerPath);
-                    let statusFile = Gio.File.new_for_path(statusPath);
-                    let powerValue = GLib.spawn_command_line_sync("cat " + powerFile.get_path());
-                    let statusValue = GLib.spawn_command_line_sync("cat " + statusFile.get_path());
-                    let power = powerValue[1].toString().replace("\n", "");
-                    
-                    this.statusLabel.set_text(power + "%");
-                    
-                    if (statusValue[1].toString().indexOf("Charging") > -1) {
-                        this._icon.icon_name = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
-                    } else {
-                        if (power < 10) {
-                            this._icon.icon_name = ICON_PREFIX + "00" + ICON_SYMBOLIC;
-                        } else if (power < 20) {
-                            this._icon.icon_name = ICON_PREFIX + "10" + ICON_SYMBOLIC;
-                        } else if (power < 30) {
-                            this._icon.icon_name = ICON_PREFIX + "20" + ICON_SYMBOLIC;
-                        } else if (power < 40) {
-                            this._icon.icon_name = ICON_PREFIX + "30" + ICON_SYMBOLIC;
-                        } else if (power < 50) {
-                            this._icon.icon_name = ICON_PREFIX + "40" + ICON_SYMBOLIC;
-                        } else if (power < 60) {
-                            this._icon.icon_name = ICON_PREFIX + "50" + ICON_SYMBOLIC;
-                        } else if (power < 70) {
-                            this._icon.icon_name = ICON_PREFIX + "60" + ICON_SYMBOLIC;
-                        } else if (power < 80) {
-                            this._icon.icon_name = ICON_PREFIX + "70" + ICON_SYMBOLIC;
-                        } else if (power < 90) {
-                            this._icon.icon_name = ICON_PREFIX + "80" + ICON_SYMBOLIC;
-                        } else if (power < 100) {
-                            this._icon.icon_name = ICON_PREFIX + "90" + ICON_SYMBOLIC;
-                        } else {
-                            this._icon.icon_name = ICON_PREFIX + "default" + ICON_SYMBOLIC;
-                        }
+                if (info.get_name().startsWith(DEVICE_PREFIX)) {
+                    let deviceId = info.get_name().split(DEVICE_PREFIX)[1];
+                    this._setBox(deviceId);
+                    let idx = activeDevices.indexOf(deviceId);
+                    if (idx > -1) {
+                        activeDevices.splice(idx, 1);
                     }
-                    
-                    this.actor.show();
-                    return;
                 }
+            }
+
+            for (var i = 0; i < activeDevices.length; i++) {
+                this._delBox(activeDevices[i]);
+            }
+
+            if (Object.keys(this._devices).length !== 0) {
+                this.actor.show();
+                return;
             }
         }
 
@@ -119,7 +162,7 @@ const DS4Battery = new Lang.Class({
 
 // for debugging
 function debug(a) {
-    a = "ds4: " + a;
+    a = "ds4ext: " + a;
     global.log(a);
 }
 
