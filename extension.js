@@ -29,12 +29,44 @@ const DS4Battery = new Lang.Class({
         return "";
     },
 
+    _getLedRGBA: function(deviceId) {
+        let ledDirPath = GLib.build_filenamev([this._powerDir.get_path(), DEVICE_PREFIX + deviceId, "device", "leds"]);
+        let ledDir = Gio.File.new_for_path(ledDirPath);
+        let fileEnum;
+        try {
+            fileEnum = ledDir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        } catch (e) {
+            fileEnum = null;
+        }
+        if (fileEnum) {
+            let info;
+            let ledInfo = {};
+            while ((info = fileEnum.next_file(null))) {
+                if (info.get_name().endsWith("blue")) {
+                    ledInfo["blue"] = this._readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                } else if (info.get_name().endsWith("red")) {
+                    ledInfo["red"] = this._readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                } else if (info.get_name().endsWith("green")) {
+                    ledInfo["green"] = this._readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                } if (info.get_name().endsWith("global")) {
+                    ledInfo["global"] = this._readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                }
+            }
+
+            if (Object.keys(ledInfo).length === 4) {
+                return "rgba(" + ledInfo.red + "," + ledInfo.green + "," + ledInfo.blue + "," + ledInfo.global + ")";
+            }
+        }
+        return null;
+    },
+
     _getDeviceInfo: function(deviceId) {
         let out = {};
 
         let status = this._readFile(deviceId, "status");
         let power = this._readFile(deviceId, "capacity");
         out["power"] = power ? power + "%" : "--";
+        out["led"] = this._getLedRGBA(deviceId);
         if (status !== "Discharging") {
             out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
         } else {
@@ -85,7 +117,16 @@ const DS4Battery = new Lang.Class({
                 icon: icon,
                 label: label
             };
-            var layout = new St.BoxLayout({ name: 'ds4Box:' + deviceId , vertical: false });
+            var layout = new St.BoxLayout({
+                name: 'ds4Box:' + deviceId,
+                vertical: false
+            });
+
+            if (devInfo["led"]) {
+                layout.style_class = "ds4-underline";
+                layout.set_style("border-color: " + devInfo["led"]);
+            }
+
             layout.add_actor(box.icon);
             layout.add_actor(box.label);
             box["layout"] = layout;
@@ -94,6 +135,14 @@ const DS4Battery = new Lang.Class({
         } else {
             box.icon.icon_name = devInfo["icon"];
             box.label.text = devInfo["power"];
+            if (devInfo["led"]) {
+                box.layout.style_class = "ds4-underline";
+                debug(devInfo["led"]);
+                box.layout.set_style("border-color: " + devInfo["led"]);
+            } else {
+                box.layout.style_class = "";
+                box.layout.set_style("");
+            }
         }
         return box;
     },
@@ -119,8 +168,8 @@ const DS4Battery = new Lang.Class({
     },
 
     _destroy: function() {
-        this.menu.box.get_children().forEach(function(c) {
-            c.destroy();
+        this.menu.box.get_children().forEach(function(cb) {
+            cb.destroy();
         });
     },
 

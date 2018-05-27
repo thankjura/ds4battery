@@ -1,0 +1,6 @@
+.ds4-underline {
+  border-bottom: 2px;
+  border-style: solid;
+  border-color: red;
+  box-sizing: border-box;
+}
