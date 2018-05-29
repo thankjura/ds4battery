@@ -11,8 +11,7 @@ const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
 const DEVICE_PREFIX = "sony_controller_battery_";
 
-//const POWER_DIR_PATH = "/sys/class/power_supply";
-const POWER_DIR_PATH = "/tmp/power_test";
+const POWER_DIR_PATH = "/sys/class/power_supply";
 
 let indicator;
 let devices = {};
