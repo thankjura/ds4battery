@@ -3,6 +3,6 @@
 	"shell-version": ["3.20", "3.22", "3.24", "3.26", "3.28", "3.30"],
 	"name": "Dual Shock 4 battery percentage",
 	"description": "Show DS4/DS3 battery remaining power percentage at the top panel",
-	"url": "https://github.com/thankjura/ds4battery",
+	"url": "https://bitbucket.org/thankjura/ds4battery",
 	"original-authors": ["me@slie.ru"]
 }
