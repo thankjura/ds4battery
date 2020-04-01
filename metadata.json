@@ -1,8 +1,8 @@
 {
 	"uuid": "ds4battery@slie.ru",
-	"shell-version": ["3.20", "3.22", "3.24", "3.26", "3.28", "3.30"],
+	"shell-version": ["3.20", "3.22", "3.24", "3.26", "3.28", "3.30", "3.32", "3.34", "3.36"],
 	"name": "Dual Shock 4 battery percentage",
 	"description": "Show DS4/DS3 battery remaining power percentage at the top panel",
-	"url": "https://bitbucket.org/thankjura/ds4battery",
+	"url": "https://github.com/thankjura/ds4battery",
 	"original-authors": ["me@slie.ru"]
 }
