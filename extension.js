@@ -6,6 +6,8 @@ const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const Mainloop = imports.mainloop;
 const Clutter = imports.gi.Clutter;
+const ByteArray = imports.byteArray;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
@@ -24,7 +26,7 @@ function readFile(deviceId, fileName) {
     let out = file.load_contents(null);
     let value = out[1];
     if (value) {
-        return value.toString().replace("\n", "");
+        return ByteArray.toString(value).replace("\n", "");
     }
 
     return "";
@@ -105,9 +107,9 @@ function updateDevice(deviceId) {
 
     if (!dev) {
         let icon = new St.Icon({
-            icon_name: devInfo["icon"],
             style_class: 'system-status-icon'
         });
+        icon.gicon = Gio.icon_new_for_string(`${Me.path}/icons/${devInfo.icon}.svg`);
 
         let label = new St.Label({
             y_align: Clutter.ActorAlign.CENTER,
@@ -146,7 +148,7 @@ function updateDevice(deviceId) {
         indicator.add_actor(button);
         devices[deviceId] = dev;
     } else {
-        dev.icon.icon_name = devInfo["icon"];
+        dev.icon.gicon = Gio.icon_new_for_string(`${Me.path}/icons/${devInfo.icon}.svg`);
         dev.label.text = devInfo["power"];
 
         if (devInfo["led"]) {
@@ -205,11 +207,6 @@ function updateDevices() {
 function debug(a) {
     a = "ds4ext: " + a;
     global.log(a);
-}
-
-function init(extensionMeta) {
-    let theme = imports.gi.Gtk.IconTheme.get_default();
-    theme.append_search_path(extensionMeta.path + "/icons");
 }
 
 function enable() {
