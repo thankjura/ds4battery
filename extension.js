@@ -11,7 +11,8 @@ const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
-const DEVICE_PREFIX = "sony_controller_battery_";
+const DEVICE_PREFIX_DUALSHOCK = "sony_controller_battery_";
+const DEVICE_PREFIX_DUALSENSE = "ps-controller-battery-";
 
 const POWER_DIR_PATH = "/sys/class/power_supply";
 
@@ -20,9 +21,10 @@ let devices = {};
 let powerDir;
 let event;
 
-function readFile(deviceId, fileName) {
-    let filePath = GLib.build_filenamev([POWER_DIR_PATH, DEVICE_PREFIX + deviceId, fileName]);
+function readFile(devName, fileName) {
+    let filePath = GLib.build_filenamev([POWER_DIR_PATH, devName, fileName]);
     let file = Gio.File.new_for_path(filePath);
+    debug(file);
     let out = file.load_contents(null);
     let value = out[1];
     if (value) {
@@ -32,8 +34,8 @@ function readFile(deviceId, fileName) {
     return "";
 }
 
-function getLedRGBA(deviceId) {
-    let ledDirPath = GLib.build_filenamev([POWER_DIR_PATH, DEVICE_PREFIX + deviceId, "device", "leds"]);
+function getLedRGBA(devName) {
+    let ledDirPath = GLib.build_filenamev([POWER_DIR_PATH, devName, "device", "leds"]);
     let ledDir = Gio.File.new_for_path(ledDirPath);
     let fileEnum;
     try {
@@ -46,13 +48,13 @@ function getLedRGBA(deviceId) {
         let ledInfo = {};
         while ((info = fileEnum.next_file(null))) {
             if (info.get_name().endsWith("blue")) {
-                ledInfo["blue"] = readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["blue"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } else if (info.get_name().endsWith("red")) {
-                ledInfo["red"] = readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["red"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } else if (info.get_name().endsWith("green")) {
-                ledInfo["green"] = readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["green"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } if (info.get_name().endsWith("global")) {
-                ledInfo["global"] = readFile(deviceId, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["global"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
             }
         }
 
@@ -63,13 +65,13 @@ function getLedRGBA(deviceId) {
     return null;
 }
 
-function getDeviceInfo(deviceId) {
+function getDeviceInfo(devName) {
     let out = {};
 
-    let status = readFile(deviceId, "status");
-    let power = readFile(deviceId, "capacity");
+    let status = readFile(devName, "status");
+    let power = readFile(devName, "capacity");
     out["power"] = power ? power + "%" : "--";
-    out["led"] = getLedRGBA(deviceId);
+    out["led"] = getLedRGBA(devName);
     if (status !== "Discharging") {
         out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
     } else {
@@ -101,9 +103,9 @@ function getDeviceInfo(deviceId) {
     return out;
 }
 
-function updateDevice(deviceId) {
-    let dev = devices[deviceId];
-    let devInfo = getDeviceInfo(deviceId);
+function updateDevice(devName) {
+    let dev = devices[devName];
+    let devInfo = getDeviceInfo(devName);
 
     if (!dev) {
         let icon = new St.Icon({
@@ -121,7 +123,7 @@ function updateDevice(deviceId) {
             style_class: "panel-button",
             reactive: false,
             track_hover: false,
-            name: 'ds4Box:' + deviceId
+            name: 'ds4Box:' + devName
         });
 
         let buttonLayout = new St.BoxLayout({
@@ -146,7 +148,7 @@ function updateDevice(deviceId) {
         buttonLayout.add_child(dev.label);
 
         indicator.add_actor(button);
-        devices[deviceId] = dev;
+        devices[devName] = dev;
     } else {
         dev.icon.gicon = Gio.icon_new_for_string(`${Me.path}/icons/${devInfo.icon}.svg`);
         dev.label.text = devInfo["power"];
@@ -161,12 +163,12 @@ function updateDevice(deviceId) {
     }
 }
 
-function deleteDevice(deviceId) {
-    var dev = devices[deviceId];
+function deleteDevice(devName) {
+    var dev = devices[devName];
     if (dev) {
         indicator.remove_actor(dev["button"]);
         dev["button"].destroy();
-        delete devices[deviceId];
+        delete devices[devName];
     }
 }
 
@@ -181,10 +183,10 @@ function updateDevices() {
     if (fileEnum != null) {
         let info;
         while ((info = fileEnum.next_file(null))) {
-            if (info.get_name().startsWith(DEVICE_PREFIX)) {
-                let deviceId = info.get_name().split(DEVICE_PREFIX)[1];
-                updateDevice(deviceId);
-                let idx = activeDevices.indexOf(deviceId);
+            let devName = info.get_name();
+            if (devName.startsWith(DEVICE_PREFIX_DUALSHOCK) || devName.startsWith(DEVICE_PREFIX_DUALSENSE)) {
+                updateDevice(devName);
+                let idx = activeDevices.indexOf(devName);
                 if (idx > -1) {
                     activeDevices.splice(idx, 1);
                 }
