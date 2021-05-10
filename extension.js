@@ -8,6 +8,7 @@ const Mainloop = imports.mainloop;
 const Clutter = imports.gi.Clutter;
 const ByteArray = imports.byteArray;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Util = imports.misc.util;
 
 const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
@@ -65,6 +66,16 @@ function getLedRGBA(devName) {
     return null;
 }
 
+function parseDeviceId(devName) {
+    for (const prefix of [DEVICE_PREFIX_DUALSENSE, DEVICE_PREFIX_DUALSHOCK]) {
+        if (devName.startsWith(prefix)) {
+            return devName.substr(prefix.length);
+        }
+    }
+    // should not happen since we only handle devices whose name start with the above prefixes
+    throw "Cannot parse deviceId: " + devName;
+}
+
 function getDeviceInfo(devName) {
     let out = {};
 
@@ -72,6 +83,7 @@ function getDeviceInfo(devName) {
     let power = readFile(devName, "capacity");
     out["power"] = power ? power + "%" : "--";
     out["led"] = getLedRGBA(devName);
+    out["deviceId"] = parseDeviceId(devName);
     if (status !== "Discharging") {
         out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
     } else {
@@ -103,6 +115,11 @@ function getDeviceInfo(devName) {
     return out;
 }
 
+function disconnectDevice(devId) {
+    let command = ['bluetoothctl', 'disconnect', devId];
+    Util.spawn(command);
+}
+
 function updateDevice(devName) {
     let dev = devices[devName];
     let devInfo = getDeviceInfo(devName);
@@ -121,7 +138,7 @@ function updateDevice(devName) {
 
         let button = new St.Button({
             style_class: "panel-button",
-            reactive: false,
+            reactive: true,
             track_hover: false,
             name: 'ds4Box:' + devName
         });
@@ -147,6 +164,7 @@ function updateDevice(devName) {
         buttonLayout.add_child(dev.icon);
         buttonLayout.add_child(dev.label);
 
+        button.connect("clicked", () => disconnectDevice(devInfo["deviceId"]));
         indicator.add_actor(button);
         devices[devName] = dev;
     } else {
