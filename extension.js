@@ -28,8 +28,11 @@ function readFile(devName, fileName) {
     let out = file.load_contents(null);
     let value = out[1];
     if (value) {
-        return ByteArray.toString(value).replace("\n", "");
-    }
+        if (!ByteArray.toString(value).match(/GjsModule byteArray/)) {
+            return ByteArray.toString(value).replace("\n", "");
+        }
+        return parseInt(value);
+   }
 
     return "";
 }
