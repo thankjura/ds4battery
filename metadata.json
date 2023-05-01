@@ -4,7 +4,8 @@
         "40",
         "41",
         "42",
-        "43"
+        "43",
+        "44"
     ],
 	"name": "DualShock/DualSense battery percentage",
 	"description": "Show DS5/DS4/DS3 battery remaining power percentage at the top panel",
