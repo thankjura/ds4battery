@@ -1,13 +1,10 @@
-const St = imports.gi.St;
-const Lang = imports.lang;
-const PanelMenu = imports.ui.panelMenu;
-const Main = imports.ui.main;
-const Gio = imports.gi.Gio;
-const GLib = imports.gi.GLib;
-const Mainloop = imports.mainloop;
-const Clutter = imports.gi.Clutter;
-const ByteArray = imports.byteArray;
-const Me = imports.misc.extensionUtils.getCurrentExtension();
+import St from 'gi://St';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
+import Shell from 'gi://Shell';
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 const ICON_PREFIX = "ds4-";
 const ICON_SYMBOLIC = "-symbolic";
@@ -16,30 +13,28 @@ const DEVICE_PREFIX_DUALSENSE = "ps-controller-battery-";
 
 const POWER_DIR_PATH = "/sys/class/power_supply";
 
-let indicator;
-let devices = {};
-let powerDir;
-let event;
-
-function readFile(devName, fileName) {
-    let filePath = GLib.build_filenamev([POWER_DIR_PATH, devName, fileName]);
-    let file = Gio.File.new_for_path(filePath);
-    debug(file);
-    let out = file.load_contents(null);
-    let value = out[1];
-    if (value) {
-        if (!ByteArray.toString(value).match(/GjsModule byteArray/)) {
-            return ByteArray.toString(value).replace("\n", "");
-        }
-        return parseInt(value);
-   }
-
-    return "";
+const debug = (msg) => {
+    msg = "ds4ext: " + msg;
+    console.log(msg);
 }
 
-function getLedRGBA(devName) {
-    let ledDirPath = GLib.build_filenamev([POWER_DIR_PATH, devName, "device", "leds"]);
-    let ledDir = Gio.File.new_for_path(ledDirPath);
+const readFile = (devName, fileName) => {
+    const filePath = GLib.build_filenamev([POWER_DIR_PATH, devName, fileName]);
+    return Shell.get_file_contents_utf8_sync(filePath);
+}
+
+const readNumFile = (devName, fileName) => {
+    const val = readFile(devName, fileName);
+    if (val) {
+        return parseInt(val);
+    }
+
+    return 0;
+}
+
+const getLedRGBA = (devName) => {
+    const ledDirPath = GLib.build_filenamev([POWER_DIR_PATH, devName, "device", "leds"]);
+    const ledDir = Gio.File.new_for_path(ledDirPath);
     let fileEnum;
     try {
         fileEnum = ledDir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
@@ -48,16 +43,16 @@ function getLedRGBA(devName) {
     }
     if (fileEnum) {
         let info;
-        let ledInfo = {};
+        const ledInfo = {};
         while ((info = fileEnum.next_file(null))) {
             if (info.get_name().endsWith("blue")) {
-                ledInfo["blue"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["blue"] = readNumFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } else if (info.get_name().endsWith("red")) {
-                ledInfo["red"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["red"] = readNumFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } else if (info.get_name().endsWith("green")) {
-                ledInfo["green"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["green"] = readNumFile(devName, "device/leds/" + info.get_name() + "/brightness");
             } if (info.get_name().endsWith("global")) {
-                ledInfo["global"] = readFile(devName, "device/leds/" + info.get_name() + "/brightness");
+                ledInfo["global"] = readNumFile(devName, "device/leds/" + info.get_name() + "/brightness");
             }
         }
 
@@ -68,14 +63,15 @@ function getLedRGBA(devName) {
     return null;
 }
 
-function getDeviceInfo(devName) {
-    let out = {};
+const getDeviceInfo = (devName) => {
+    const out = {};
 
-    let status = readFile(devName, "status");
-    let power = readFile(devName, "capacity");
+    const state = readFile(devName, "status");
+    const power = readNumFile(devName, "capacity");
     out["power"] = power ? power + "%" : "--";
     out["led"] = getLedRGBA(devName);
-    if (status !== "Discharging") {
+    if (state && state.trim() !== "Discharging") {
+        debug("diss");
         out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
     } else {
         if (power < 10) {
@@ -106,131 +102,134 @@ function getDeviceInfo(devName) {
     return out;
 }
 
-function updateDevice(devName) {
-    let dev = devices[devName];
-    let devInfo = getDeviceInfo(devName);
 
-    if (!dev) {
-        let icon = new St.Icon({
-            style_class: 'system-status-icon'
-        });
-        icon.gicon = Gio.icon_new_for_string(`${Me.path}/icons/${devInfo.icon}.svg`);
+export default class DS4Battery extends Extension {
+    enable() {
+        this._devices = {};
+        this._powerDir = Gio.File.new_for_path(POWER_DIR_PATH);
+        this._indicator = new St.BoxLayout({name: 'ds4Box', vertical: false});
+        Main.panel._rightBox.insert_child_at_index(this._indicator, 0);
+        this._indicator.hide();
+        this._updateDevices();
+        this._event_id = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            5, 
+            () => {
+                this._updateDevices();
+                return GLib.SOURCE_CONTINUE;
+            }
+        );
+    }
 
-        let label = new St.Label({
-            y_align: Clutter.ActorAlign.CENTER,
-            text: devInfo["power"],
-            style_class: "power-label"
-        });
+    disable() {
+        this._powerDir = null;
+        Main.panel._rightBox.remove_child(this._indicator);
+        this._indicator = null;
+        GLib.source_remove(this._event_id);
+        this._event_id = null;
+        this._devices = {};
+    }
 
-        let button = new St.Button({
-            style_class: "panel-button",
-            reactive: false,
-            track_hover: false,
-            name: 'ds4Box:' + devName
-        });
+    _updateDevice(devName) {
+        let dev = this._devices[devName];
+        const devInfo = getDeviceInfo(devName);
 
-        let buttonLayout = new St.BoxLayout({
-            vertical: false
-        });
+        if (!dev) {
+            const icon = new St.Icon({
+                style_class: 'system-status-icon'
+            });
+            icon.gicon = Gio.icon_new_for_string(`${this.path}/icons/${devInfo.icon}.svg`);
+            debug(`${this.path}/icons/${devInfo.icon}.svg`);
 
-        button.add_actor(buttonLayout);
+            const label = new St.Label({
+                y_align: Clutter.ActorAlign.CENTER,
+                text: devInfo["power"],
+                style_class: "power-label"
+            });
 
-        dev = {
-            icon: icon,
-            label: label,
-            layout: buttonLayout,
-            button: button
-        };
+            const button = new St.Button({
+                style_class: "panel-button",
+                reactive: false,
+                track_hover: false,
+                name: 'ds4Box:' + devName
+            });
 
-        if (devInfo["led"]) {
-            buttonLayout.style_class = "ds4-underline";
-            buttonLayout.set_style("border-color: " + devInfo["led"]);
-        }
+            const buttonLayout = new St.BoxLayout({
+                vertical: false
+            });
 
-        buttonLayout.add_child(dev.icon);
-        buttonLayout.add_child(dev.label);
+            button.add_actor(buttonLayout);
 
-        indicator.add_actor(button);
-        devices[devName] = dev;
-    } else {
-        dev.icon.gicon = Gio.icon_new_for_string(`${Me.path}/icons/${devInfo.icon}.svg`);
-        dev.label.text = devInfo["power"];
+            dev = {
+                icon: icon,
+                label: label,
+                layout: buttonLayout,
+                button: button
+            };
 
-        if (devInfo["led"]) {
-            dev.layout.style_class = "ds4-underline";
-            dev.layout.set_style("border-color: " + devInfo["led"]);
+            if (devInfo["led"]) {
+                buttonLayout.style_class = "ds4-underline";
+                buttonLayout.set_style("border-color: " + devInfo["led"]);
+            }
+
+            buttonLayout.add_child(dev.icon);
+            buttonLayout.add_child(dev.label);
+
+            this._indicator.add_actor(button);
+            this._devices[devName] = dev;
         } else {
-            dev.layout.style_class = "";
-            dev.layout.set_style("");
+            dev.icon.gicon = Gio.icon_new_for_string(`${this.path}/icons/${devInfo.icon}.svg`);
+            dev.label.text = devInfo["power"];
+
+            if (devInfo["led"]) {
+                dev.layout.style_class = "ds4-underline";
+                dev.layout.set_style("border-color: " + devInfo["led"]);
+            } else {
+                dev.layout.style_class = "";
+                dev.layout.set_style("");
+            }
         }
     }
-}
 
-function deleteDevice(devName) {
-    var dev = devices[devName];
-    if (dev) {
-        indicator.remove_actor(dev["button"]);
-        dev["button"].destroy();
-        delete devices[devName];
+    _deleteDevice(devName) {
+        const dev = this._devices[devName];
+        if (dev) {
+            this._indicator.remove_actor(dev["button"]);
+            dev["button"].destroy();
+            delete this._devices[devName];
+        }
     }
-}
 
-function updateDevices() {
-    let fileEnum;
-    try {
-        fileEnum = powerDir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
-    } catch (e) {
-        fileEnum = null;
-    }
-    let activeDevices = Object.keys(devices);
-    if (fileEnum != null) {
-        let info;
-        while ((info = fileEnum.next_file(null))) {
-            let devName = info.get_name();
-            if (devName.startsWith(DEVICE_PREFIX_DUALSHOCK) || devName.startsWith(DEVICE_PREFIX_DUALSENSE)) {
-                updateDevice(devName);
-                let idx = activeDevices.indexOf(devName);
-                if (idx > -1) {
-                    activeDevices.splice(idx, 1);
+    _updateDevices() {
+        let fileEnum;
+        try {
+            fileEnum = this._powerDir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        } catch (e) {
+            fileEnum = null;
+        }
+        const activeDevices = Object.keys(this._devices);
+        if (fileEnum != null) {
+            let info;
+            while ((info = fileEnum.next_file(null))) {
+                const devName = info.get_name();
+                if (devName.startsWith(DEVICE_PREFIX_DUALSHOCK) || devName.startsWith(DEVICE_PREFIX_DUALSENSE)) {
+                    this._updateDevice(devName);
+                    const idx = activeDevices.indexOf(devName);
+                    if (idx > -1) {
+                        activeDevices.splice(idx, 1);
+                    }
                 }
+            }
+
+            for (var i = 0; i < activeDevices.length; i++) {
+                this._deleteDevice(activeDevices[i]);
             }
         }
 
-        for (var i = 0; i < activeDevices.length; i++) {
-            deleteDevice(activeDevices[i]);
+        if (Object.keys(this._devices).length !== 0) {
+            this._indicator.show();
+        } else {
+            this._indicator.hide();
         }
     }
-
-    if (Object.keys(devices).length !== 0) {
-        indicator.show();
-    } else {
-        indicator.hide();
-    }
-}
-
-
-function debug(a) {
-    a = "ds4ext: " + a;
-    global.log(a);
-}
-
-function enable() {
-    powerDir = Gio.File.new_for_path(POWER_DIR_PATH);
-    indicator = new St.BoxLayout({name: 'ds4Box', vertical: false});
-    Main.panel._rightBox.insert_child_at_index(indicator, 0);
-    indicator.hide();
-    updateDevices();
-    event = GLib.timeout_add_seconds(0, 5, function() {
-        updateDevices();
-        return true;
-    });
-}
-
-function disable() {
-    powerDir = null;
-    Main.panel._rightBox.remove_child(indicator);
-    indicator = null;
-    Mainloop.source_remove(event);
-    event = null;
-    devices = {};
 }
