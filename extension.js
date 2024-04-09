@@ -71,7 +71,6 @@ const getDeviceInfo = (devName) => {
     out["power"] = power ? power + "%" : "--";
     out["led"] = getLedRGBA(devName);
     if (state && state.trim() !== "Discharging") {
-        debug("diss");
         out["icon"] = ICON_PREFIX + "charging" + ICON_SYMBOLIC;
     } else {
         if (power < 10) {
@@ -139,7 +138,6 @@ export default class DS4Battery extends Extension {
                 style_class: 'system-status-icon'
             });
             icon.gicon = Gio.icon_new_for_string(`${this.path}/icons/${devInfo.icon}.svg`);
-            debug(`${this.path}/icons/${devInfo.icon}.svg`);
 
             const label = new St.Label({
                 y_align: Clutter.ActorAlign.CENTER,
@@ -158,7 +156,7 @@ export default class DS4Battery extends Extension {
                 vertical: false
             });
 
-            button.add_actor(buttonLayout);
+            button.add_child(buttonLayout);
 
             dev = {
                 icon: icon,
@@ -175,7 +173,7 @@ export default class DS4Battery extends Extension {
             buttonLayout.add_child(dev.icon);
             buttonLayout.add_child(dev.label);
 
-            this._indicator.add_actor(button);
+            this._indicator.add_child(button);
             this._devices[devName] = dev;
         } else {
             dev.icon.gicon = Gio.icon_new_for_string(`${this.path}/icons/${devInfo.icon}.svg`);
@@ -192,9 +190,10 @@ export default class DS4Battery extends Extension {
     }
 
     _deleteDevice(devName) {
+        debug("delete device " + devName);
         const dev = this._devices[devName];
         if (dev) {
-            this._indicator.remove_actor(dev["button"]);
+            this._indicator.remove_child(dev["button"]);
             dev["button"].destroy();
             delete this._devices[devName];
         }
