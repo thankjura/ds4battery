@@ -3,7 +3,10 @@
 	"name": "DualShock/DualSense battery percentage",
 	"description": "Show DS5/DS4/DS3 battery remaining power percentage at the top panel",
 	"shell-version": [
-        "45", "46", "47"
+        "45",
+		"46",
+		"47",
+		"48"
     ],
 	"url": "https://github.com/thankjura/ds4battery",
 	"original-authors": ["me@slie.ru"]
