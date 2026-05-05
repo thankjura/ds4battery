@@ -123,6 +123,7 @@ export default class DS4Battery extends Extension {
     disable() {
         this._powerDir = null;
         Main.panel._rightBox.remove_child(this._indicator);
+        this._indicator?.destroy()
         this._indicator = null;
         GLib.source_remove(this._event_id);
         this._event_id = null;
