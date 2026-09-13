@@ -106,7 +106,7 @@ export default class DS4Battery extends Extension {
     enable() {
         this._devices = {};
         this._powerDir = Gio.File.new_for_path(POWER_DIR_PATH);
-        this._indicator = new St.BoxLayout({name: 'ds4Box', vertical: false});
+        this._indicator = new St.BoxLayout({name: 'ds4Box', orientation: Clutter.Orientation.HORIZONTAL});
         Main.panel._rightBox.insert_child_at_index(this._indicator, 0);
         this._indicator.hide();
         this._updateDevices();
@@ -154,7 +154,7 @@ export default class DS4Battery extends Extension {
             });
 
             const buttonLayout = new St.BoxLayout({
-                vertical: false
+                orientation: Clutter.Orientation.HORIZONTAL
             });
 
             button.add_child(buttonLayout);
